@@ -4757,17 +4757,17 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 		chip->batt_id_chan = NULL;
 		return rc;
 	}
-#ifdef CONFIG_BAT_NTC_10K
-	chip->batt_therm_chan = iio_channel_get(&pdev->dev, "batt-therm-ntc-10k");
-#else
+	/* Try both, fail only if both are errors */
 	chip->batt_therm_chan = iio_channel_get(&pdev->dev, "batt-therm");
-#endif
 	if (IS_ERR(chip->batt_therm_chan)) {
-		rc = PTR_ERR(chip->batt_therm_chan);
-		if (rc != -EPROBE_DEFER)
-			pr_err("batt-therm channel unavailable, rc=%d\n", rc);
-		chip->batt_therm_chan = NULL;
-		return rc;
+		chip->batt_therm_chan = iio_channel_get(&pdev->dev, "batt-therm-ntc-10k");
+		if (IS_ERR(chip->batt_therm_chan)) {
+			rc = PTR_ERR(chip->batt_therm_chan);
+			if (rc != -EPROBE_DEFER)
+				pr_err("batt-therm channel unavailable, rc=%d\n", rc);
+			chip->batt_therm_chan = NULL;
+			return rc;
+		}
 	}
 
 	chip->dev = &pdev->dev;

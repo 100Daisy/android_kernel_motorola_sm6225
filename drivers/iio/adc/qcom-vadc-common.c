@@ -555,7 +555,6 @@ struct lut_table {
 	u32 tablesize;
 };
 
-#ifdef CONFIG_BAT_NTC_10K
 static const struct vadc_map_pt adcmap_batt_therm_30k_NTC10K[] = {
 	{1618,	-400},
 	{1593,	-380},
@@ -628,12 +627,9 @@ static const struct vadc_map_pt adcmap_batt_therm_30k_NTC10K[] = {
 	{65,	960},
 	{62,	980}
 };
-#endif
 
 static const struct lut_table lut_table_30[] = {
-#ifdef CONFIG_BAT_NTC_10K
 	{adcmap_batt_therm_30k_NTC10K, ARRAY_SIZE(adcmap_batt_therm_30k_NTC10K)},
-#endif
 	{adcmap_batt_therm_30k,	ARRAY_SIZE(adcmap_batt_therm_30k)},
 	{adcmap_batt_therm_30k_6125, ARRAY_SIZE(adcmap_batt_therm_30k_6125)},
 };

@@ -3602,7 +3602,6 @@ static int smb5_init_hw(struct smb5 *chip)
 		}
 	}
 
-#ifdef CONFIG_BAT_NTC_10K
 	rc = smb5_configure_internal_pull(chg, BAT_THERM,
 			get_valid_pullup(PULL_30K));
 	if (rc < 0) {
@@ -3611,7 +3610,6 @@ static int smb5_init_hw(struct smb5 *chip)
 			rc);
 		return rc;
 	}
-#endif
 	return rc;
 }
 
