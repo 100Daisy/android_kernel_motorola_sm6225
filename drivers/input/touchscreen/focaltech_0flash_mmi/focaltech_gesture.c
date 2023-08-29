@@ -101,7 +101,7 @@ static struct fts_gesture_st fts_gesture_data;
 #ifdef CONFIG_HAS_WAKELOCK
 static struct wake_lock gesture_wakelock;
 #else
-static struct wakeup_source *gesture_wakelock;
+static struct wakeup_source gesture_wakelock;
 #endif
 static struct sensors_classdev __maybe_unused sensors_touch_cdev = {
     .name = "dt-gesture",
@@ -113,8 +113,8 @@ static struct sensors_classdev __maybe_unused sensors_touch_cdev = {
     .sensor_power = "1",
     .min_delay = 0,
     .max_delay = 0,
-    /* WAKE_UP & SPECIAL_REPORT */
-    .flags = 1 | 6,
+    /* WAKE_UP & ON_CHANGE */
+    .flags = 1 | 2,
     .fifo_reserved_event_count = 0,
     .fifo_max_event_count = 0,
     .enabled = 0,
@@ -241,7 +241,6 @@ int fts_create_gesture_sysfs(struct device *dev)
 static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
 {
     int gesture;
-    int ret = 0;
 #ifdef FOCALTECH_SENSOR_EN
     static int report_cnt = 0;
 #endif
@@ -298,51 +297,21 @@ static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
     if (gesture != -1) {
         FTS_DEBUG("Gesture Code=%d", gesture);
 #ifdef FOCALTECH_SENSOR_EN
-#ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
         if (!(fts_data->wakeable && fts_data->should_enable_gesture)) {
             FTS_INFO("Gesture got but wakeable not set. Skip this gesture.");
             return;
         }
-        if (fts_data->pdata->report_gesture_key) {
-            input_report_key(fts_data->sensor_pdata->input_sensor_dev, KEY_F1, 1);
-            input_sync(fts_data->sensor_pdata->input_sensor_dev);
-            input_report_key(fts_data->sensor_pdata->input_sensor_dev, KEY_F1, 0);
-            input_sync(fts_data->sensor_pdata->input_sensor_dev);
-            ++report_cnt;
-        } else {
-            input_report_abs(fts_data->sensor_pdata->input_sensor_dev,
-                            ABS_DISTANCE, ++report_cnt);
-            input_sync(fts_data->sensor_pdata->input_sensor_dev);
-        }
-#else
-        if (!fts_data->wakeable) {
-            FTS_INFO("Gesture got but wakeable not set. Skip this gesture.");
-            return;
-        }
-        /* report single tap */
-        if (gesture == KEY_GESTURE_U) {
-            if (fts_data->imports && fts_data->imports->report_gesture) {
-                struct gesture_event_data event;
-
-                FTS_INFO("invoke imported report gesture function\n");
-                event.evcode = 1;
-                /* call class method */
-                ret = fts_data->imports->report_gesture(&event);
-                ++report_cnt;
-            }
-        }
-#endif
+        input_report_abs(fts_data->sensor_pdata->input_sensor_dev,
+                         ABS_DISTANCE, ++report_cnt);
         FTS_INFO("input report: %d", report_cnt);
         if (report_cnt >= REPORT_MAX_COUNT)
             report_cnt = 0;
-
-        if (!ret) {
+        input_sync(fts_data->sensor_pdata->input_sensor_dev);
 #ifdef CONFIG_HAS_WAKELOCK
         wake_lock_timeout(&gesture_wakelock, msecs_to_jiffies(5000));
 #else
-        PM_WAKEUP_EVENT(gesture_wakelock, 5000);
+        __pm_wakeup_event(&gesture_wakelock, 5000);
 #endif
-        }
 #else
         input_report_key(input_dev, gesture, 1);
         input_sync(input_dev);
@@ -353,7 +322,6 @@ static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
 }
 
 #ifdef FOCALTECH_SENSOR_EN
-#ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
 static int fts_sensor_set_enable(struct sensors_classdev *sensors_cdev,
     unsigned int enable)
 {
@@ -391,17 +359,10 @@ static int fts_sensor_init(struct fts_ts_data *data)
     }
     data->sensor_pdata = sensor_pdata;
 
-    if (data->pdata->report_gesture_key) {
-        __set_bit(EV_KEY, sensor_input_dev->evbit);
-        __set_bit(KEY_F1, sensor_input_dev->keybit);
-    }
-    else {
-        __set_bit(EV_ABS, sensor_input_dev->evbit);
-        input_set_abs_params(sensor_input_dev, ABS_DISTANCE,
-                                0, REPORT_MAX_COUNT, 0, 0);
-    }
+    __set_bit(EV_ABS, sensor_input_dev->evbit);
     __set_bit(EV_SYN, sensor_input_dev->evbit);
-
+    input_set_abs_params(sensor_input_dev, ABS_DISTANCE,
+                         0, REPORT_MAX_COUNT, 0, 0);
     sensor_input_dev->name = "double-tap";
     data->sensor_pdata->input_sensor_dev = sensor_input_dev;
 
@@ -444,7 +405,6 @@ int fts_sensor_remove(struct fts_ts_data *data)
     data->should_enable_gesture = false;
     return 0;
 }
-#endif
 #endif
 
 /*****************************************************************************
@@ -651,17 +611,10 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 #ifdef CONFIG_HAS_WAKELOCK
         wake_lock_init(&gesture_wakelock, WAKE_LOCK_SUSPEND, "poll-wake-lock");
 #else
-        PM_WAKEUP_REGISTER(ts_data->dev, gesture_wakelock, "poll-wake-lock");
-        if (!gesture_wakelock) {
-            FTS_ERROR("failed to allocate wakeup source\n");
-            return -ENOMEM;
-        }
+        wakeup_source_init(&gesture_wakelock, "ets_wake_lock");
 #endif
-#ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
         if (!fts_sensor_init(ts_data))
-#endif
             initialized_sensor = true;
-
     }
 #endif
 

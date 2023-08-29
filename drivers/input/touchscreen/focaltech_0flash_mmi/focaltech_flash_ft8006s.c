@@ -40,11 +40,6 @@
 *****************************************************************************/
 #define FTS_READ_BOOT_ID_TIMEOUT                    3
 #define FTS_FLASH_PACKET_LENGTH_SPI                 (32 * 1024 - 16)
-#define FTS_FLASH_DELAY_INIT                        12
-#define FTS_FLASH_DRWR_SUPPORT                      0
-#define FTS_FLASH_HALF_LENGTH                       0
-#define FTS_CMD_ECC_LENGTH_MAX                      (128 * 1024)
-#define FTS_ROMBOOT_CMD_ECC_FINISH_OK               0xA5
 
 /*****************************************************************************
 * Global variable or extern global variabls/functions
@@ -63,19 +58,25 @@ static int fts_enter_into_boot(void)
     int i = 0;
     int j = 0;
     u8 cmd[2] = { 0 };
+    struct fts_upgrade *upg = fwupgrade;
+
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("enter_into_boot: upg/setting_nf is null");
+        return -EINVAL;
+    }
 
     FTS_INFO("enter into boot environment");
     for (i = 0; i < FTS_UPGRADE_LOOP; i++) {
         /* hardware tp reset to boot */
         fts_fwupg_hardware_reset_to_boot();
-        mdelay(FTS_FLASH_DELAY_INIT);
+        mdelay(upg->setting_nf->delay_init);
 
         /* enter into boot & check boot id*/
         for (j = 0; j < FTS_READ_BOOT_ID_TIMEOUT; j++) {
             cmd[0] = FTS_CMD_START1;
             ret = fts_write(cmd, 1);
             if (ret >= 0) {
-                mdelay(FTS_FLASH_DELAY_INIT);
+                mdelay(upg->setting_nf->delay_init);
                 ret = fts_check_bootid();
                 if (0 == ret) {
                     FTS_INFO("boot id check pass, retry=%d", i);
@@ -102,14 +103,20 @@ static int fts_dpram_write(u32 saddr, const u8 *buf, u32 len, bool wpram)
     u32 packet_number = 0;
     u32 packet_len = 0;
     u32 packet_size = FTS_FLASH_PACKET_LENGTH_SPI;
+    struct fts_upgrade *upg = fwupgrade;
 
 	FTS_INFO("dpram write");
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("dpram_write: upg/setting_nf is null");
+        return -EINVAL;
+    }
+
     if (NULL == buf) {
         FTS_ERROR("fw buf is null");
         return -EINVAL;
     }
 
-    if ((len < FTS_MIN_LEN) || (len > FTS_MAX_LEN_APP)) {
+    if ((len < FTS_MIN_LEN) || (len > upg->setting_nf->app2_offset)) {
         FTS_ERROR("fw length(%d) fail", len);
         return -EINVAL;
     }
@@ -172,8 +179,14 @@ static int fts_ecc_cal_tp(u32 ecc_saddr, u32 ecc_len, u16 *ecc_value)
     int i = 0;
     u8 cmd[FTS_ROMBOOT_CMD_ECC_NEW_LEN] = { 0 };
     u8 value[2] = { 0 };
+    struct fts_upgrade *upg = fwupgrade;
 
 	FTS_INFO("ecc calc in tp");
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("ecc_cal_tp: upg/setting_nf is null");
+        return -EINVAL;
+    }
+
     cmd[0] = FTS_ROMBOOT_CMD_ECC;
     cmd[1] = BYTE_OFF_16(ecc_saddr);
     cmd[2] = BYTE_OFF_8(ecc_saddr);
@@ -198,7 +211,7 @@ static int fts_ecc_cal_tp(u32 ecc_saddr, u32 ecc_len, u16 *ecc_value)
             FTS_ERROR("ecc finish cmd fail");
             return ret;
         }
-        if (FTS_ROMBOOT_CMD_ECC_FINISH_OK == value[0])
+        if (upg->setting_nf->eccok_val == value[0])
             break;
         mdelay(1);
     }
@@ -250,9 +263,19 @@ static int fts_ecc_check(const u8 *buf, u32 len, u32 ecc_saddr)
     int packet_number = 0;
     int packet_remainder = 0;
     int offset = 0;
-    u32 packet_size = FTS_CMD_ECC_LENGTH_MAX;
+	u32 packet_size = FTS_MAX_LEN_FILE;
+    struct fts_upgrade *upg = fwupgrade;
 
-    FTS_INFO("ecc check");
+	FTS_INFO("ecc check");
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("ecc_check: upg/setting_nf is null");
+        return -EINVAL;
+    }
+
+    if (upg->setting_nf->ecclen_max) {
+        packet_size = upg->setting_nf->ecclen_max;
+    }
+
     packet_number = len / packet_size;
     packet_remainder = len % packet_size;
     if (packet_remainder)
@@ -296,8 +319,13 @@ static int fts_pram_write_ecc(const u8 *buf, u32 len)
     u16 code_len = 0;
     u16 code_len_n = 0;
     u32 pram_start_addr = 0;
+    struct fts_upgrade *upg = fwupgrade;
+	FTS_INFO("begin to write pram app(bin len:%d)", len);
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("pram_write_ecc: upg/setting_nf is null");
+        return -EINVAL;
+    }
 
-    FTS_INFO("begin to write pram app(bin len:%d)", len);
     /* get pram app length */
     code_len = ((u16)buf[FTS_APP_INFO_OFFSET + 0] << 8)
                + buf[FTS_APP_INFO_OFFSET + 1];
@@ -308,11 +336,10 @@ static int fts_pram_write_ecc(const u8 *buf, u32 len)
         return -EINVAL;
     }
 
-    if (FTS_FLASH_HALF_LENGTH) {
+    if (upg->setting_nf->half_length)
         pram_app_size = ((u32) code_len) * 2;
-    } else {
+    else
         pram_app_size = (u32) code_len;
-    }
 
     if ((pram_app_size < FTS_MIN_LEN) || (pram_app_size > FTS_MAX_LEN_APP)) {
         FTS_ERROR("pram app length(%d) is invalid", pram_app_size);
@@ -347,8 +374,13 @@ static int fts_dram_write_ecc(const u8 *buf, u32 len)
     u16 const_len = 0;
     u16 const_len_n = 0;
     const u8 *dram_buf = NULL;
-
+    struct fts_upgrade *upg = fwupgrade;
 	FTS_INFO("begin to write dram data(bin len:%d)", len);
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("dram_write_ecc: upg/setting_nf is null");
+        return -EINVAL;
+    }
+
     /* get dram data length */
     const_len = ((u16)buf[FTS_APP_INFO_OFFSET + 0x8] << 8)
                 + buf[FTS_APP_INFO_OFFSET + 0x9];
@@ -359,11 +391,10 @@ static int fts_dram_write_ecc(const u8 *buf, u32 len)
         return 0;
     }
 
-    if (FTS_FLASH_HALF_LENGTH) {
+    if (upg->setting_nf->half_length)
         dram_size = ((u32) const_len) * 2;
-    } else {
+    else
         dram_size = (u32) const_len;
-    }
 
     if ((dram_size <= 0) || (dram_size > FTS_MAX_LEN_APP_PARAMS)) {
         FTS_ERROR("dram data length(%d) is invalid", dram_size);
@@ -419,8 +450,13 @@ static int fts_pram_start(void)
 int fts_fw_write_start(const u8 *buf, u32 len, bool need_reset)
 {
     int ret = 0;
+    struct fts_upgrade *upg = fwupgrade;
+	FTS_INFO("begin to write and start fw(bin len:%d)", len);
+    if (!upg || !upg->setting_nf) {
+        FTS_ERROR("fw_write_start: upg/setting_nf is null");
+        return -EINVAL;
+    }
 
-    FTS_INFO("begin to write and start fw(bin len:%d)", len);
     fts_data->fw_is_running = false;
 
     if (need_reset) {
@@ -439,7 +475,7 @@ int fts_fw_write_start(const u8 *buf, u32 len, bool need_reset)
         return ret;
     }
 
-	if (FTS_FLASH_DRWR_SUPPORT) {
+	if (upg->setting_nf->drwr_support) {
         /* write dram */
         ret = fts_dram_write_ecc(buf, len);
         if (ret < 0) {

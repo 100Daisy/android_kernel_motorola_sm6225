@@ -98,7 +98,6 @@
 #define FTS_REG_IDE_PARA_STATUS             0xB6
 #define FTS_REG_GLOVE_MODE_EN               0xC0
 #define FTS_REG_COVER_MODE_EN               0xC1
-#define FTS_REG_PEN_DETECTION               0xC2
 #define FTS_REG_CHARGER_MODE_EN             0x8B
 #define FTS_REG_GESTURE_EN                  0xD0
 #define FTS_REG_GESTURE_OUTPUT_ADDRESS      0xD3
@@ -123,7 +122,7 @@
  * point report check
  * default: disable
  */
-#define FTS_POINT_REPORT_CHECK_EN               1
+#define FTS_POINT_REPORT_CHECK_EN               0
 
 /*****************************************************************************
 * Global variable or extern global variabls/functions

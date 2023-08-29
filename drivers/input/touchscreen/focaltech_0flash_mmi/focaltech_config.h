@@ -150,7 +150,7 @@
  * show debug log info
  * enable it for debug, disable it for release
  */
-#define FTS_DEBUG_EN                            0
+#define FTS_DEBUG_EN                            1
 
 /*
  * Linux MultiTouch Protocol
@@ -178,42 +178,13 @@
  * ESD check & protection
  * default: disable
  */
-#ifdef FOCALTECH_ESD_EN
 #define FTS_ESDCHECK_EN                         1
-#if defined(CONFIG_INPUT_FOCALTECH_0FLASH_MMI_IC_NAME_FT8006S_AA)
-#define FTS_DEBUG_ESD_EN                         1
-#else
-#define FTS_DEBUG_ESD_EN                         0
-#endif
-#else
-#define FTS_ESDCHECK_EN                         0
-#endif
-
-/*
- * irq enable when fts suspend
- * default: disable
- */
-#ifdef FOCALTECH_SUSPEND_IRQ_ENABLE
-#define FTS_SUSPEND_IRQ_EN					1
-#else
-#define FTS_SUSPEND_IRQ_EN					0
-#endif
-
-/*
- * FTS CONFIG_DRM_PANEL check & protection
- * default: disable
- */
-#if defined(CONFIG_DRM_PANEL) && defined(CONFIG_INPUT_FOCALTECH_0FLASH_MMI_IC_NAME_FT8006S_AA)
-#define FTS_CONFIG_DRM_PANEL                    1
-#else
-#define FTS_CONFIG_DRM_PANEL                    0
-#endif
 
 /*
  * Production test enable
  * 1: enable, 0:disable(default)
  */
-#define FTS_TEST_EN                             0
+#define FTS_TEST_EN                             1
 
 /*
  * Nodes for tools, please keep enable
@@ -276,7 +247,7 @@
  * You should rename fw to "focaltech_ts_fw_tianma", and push it into
  * etc/firmware or by customers
  */
-#define FTS_MODULE_NAME                        ""
+#define FTS_MODULE_NAME                        "dsbj"
 #define FTS_MODULE2_NAME                       ""
 #define FTS_MODULE3_NAME                       ""
 
@@ -286,7 +257,7 @@
  * NOTE: if FTS_GET_MODULE_NUM > 1, it's the fw corresponding with FTS_VENDOR_ID
  * NOTE: git may ignore xxx.i file
  */
-#define FTS_UPGRADE_FW_FILE                      "include/firmware/fw_sample.i"
+#define FTS_UPGRADE_FW_FILE                      "include/firmware/focaltech-dsbj-ft8006s_aa-05-0000-cebu.i"
 
 /*
  * if FTS_GET_MODULE_NUM >= 2, fw corrsponding with FTS_VENDOR_ID2
