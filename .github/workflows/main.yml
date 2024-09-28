@@ -43,7 +43,7 @@ jobs:
         tar -czvf borneo-kernel.tar.gz out/borneo-kernel
         
     - name: Upload artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: Kernel
         path: borneo-kernel.tar.gz
